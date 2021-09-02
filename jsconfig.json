@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        // "baseUrl": ".",
+        "baseUrl": "./",
+        "paths": {
+            "@/*": [
+                // "./src/*"
+                "src/*"
+            ]
+        },
+        "target": "es2015"
+    },
+    "exclude": [
+        "node_modules",
+        "dist"
+    ],
+    "include": [
+        "src/**/*"
+    ]
+}
