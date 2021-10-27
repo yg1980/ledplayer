@@ -1,23 +1,26 @@
-<!--  -->
-<template>
-  <div ref="outdiv" class="outdiv">
-    <div
-      class="msgbox"
+<!--  
+    .msgbox 
       :style="{
         'background-color': program_info.back_color,
         width: program_info.width + 'px',
         height: program_info.height + 'px',
       }"
-    >
-      <p
-        class="msgcontent"
-        v-text="program_info.url"
-        :style="{
-          'font-size': program_info.font_size + 'px',
-          color: program_info.color,
-        }"
-      ></p>
-    </div>
+-->
+<template>
+  <div
+    class="msgbox"
+    :style="{
+      'background-color': program_info.back_color,
+    }"
+  >
+    <p
+      class="msgcontent"
+      v-text="program_info.url"
+      :style="{
+        'font-size': program_info.font_size + 'px',
+        color: program_info.color,
+      }"
+    ></p>
   </div>
 </template>
 
@@ -27,9 +30,7 @@
 export default {
   name: "TextShow",
   data() {
-    return {
-    
-    };
+    return {};
   },
   computed: {},
   props: {
@@ -41,8 +42,7 @@ export default {
       },
     },
   },
-  methods: {
-  },
+  methods: {},
   //生命周期 - 创建完成（访问当前this实例）
   created() {},
   //生命周期 - 挂载完成（访问DOM元素）
@@ -50,15 +50,12 @@ export default {
 </script>
 <style scoped>
 /* @import url(); 引入css类 */
-/* .outdiv{
-  width: 100%;
-} */
+
 .msgbox {
   margin: 0 auto;
   padding: 0;
-  /* width  height 动态改变 */
-  width: 256px;
-  height: 160px;
+  width: 100%;
+  height: 100%;
   background-color: #000;
   /* border: 1px solid red; */
   overflow: hidden;
@@ -73,40 +70,7 @@ export default {
   white-space: pre-wrap;
 }
 
-.msgedit {
-  margin: 10px auto;
-  /* width: 500px; */
-}
-.msgedit textarea {
-  width: 100%;
-  box-sizing: border-box;
-}
-.msgctrl {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.msgsizeselect {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .msgcontent {
   text-align: center;
-}
-.el-select-size {
-  width: 120px;
-}
-/*修改 渲染后的 标签 需要在全局css里改;*/
-/* .elinput-pname input{
-  background-color: red;
-  padding: 0 2px;
-} */
-
-.elinput-pname {
-  font-size: 16px;
-  width: 180px;
 }
 </style>

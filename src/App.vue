@@ -1,97 +1,205 @@
 <template>
   <div id="app">
     <!-- <Home></Home> -->
+    <!-- class="animate__animated animate__fadeIn"  -->
+    <!-- 2021-10-21 div.item 加了v-cloak, 也不行,;; 全加载一遍 第二遍好点, 再循环还闪屏 -->
+    <!-- 加animate css 是 为了掩盖 闪烁 -->
     <div
       class="item"
       v-for="(item, index) in playList"
-      :key="item.id"
+      :key="item.schedule_id"
       v-if="index === curIndex"
+      :style="{ width: width + 'px', height: height + 'px' }"
     >
-      <img v-if="item.type == 'picture'" :src="item.url" />
-      <p v-else-if="item.type == 'text'">{{ item.url }}</p>
+      <img
+        class="animate__animated animate__fadeIn"
+        v-if="item.type == 'picture'"
+        :src="item.url"
+      />
+      <video
+        v-if="item.type == 'video'"
+        :src="item.url"
+        autoplay
+        muted
+        loop
+      ></video>
+      <Text-show v-if="item.type == 'text'" :program_info="item"></Text-show>
     </div>
-    <div>
-      <button @click="clickmy">next</button>
-    </div>
-    <div>
-      <button @click="size(0)">--</button>
-      <button @click="size(1)">++</button>
-    </div>
-    <Text-show :program_info="program_info"></Text-show>
   </div>
 </template>
 
 <script>
 import Home from "@/views/Home.vue";
 import TextShow from "@/components/TextShow.vue";
+import { getDefaultList, LedSize } from "../static/ledSetting.js";
 export default {
   name: "App",
   data() {
     return {
-      program_info: {
-        // resource_id: this.text_info.resource_id,
-        // name: this.text_info.name,
-        type: "text",
-        color: "#00ff00", //'#00ff00',
-        back_color: "#000000", //'#000000',
-        url: `谨慎驾驶上的发生地\n注意安全`, //"请输入",
-        font_size: 40, //20,
-        width: 256,
-        height: 160,
-      },
+      //启动定时器, 定时向后台 查询节目,
+      //获取后,如果节目有变化, 则修改最新的本地bak列表
+      //定时 下一条
+
+      timerId_getList: null,
+      timerId_next: null,
+      width: 400,
+      height: 300,
+      errCntForGetPlayList: 0,
+
+      playListBak: [],
       curIndex: 0,
-      playList: [
-        {
-          id: "1",
-          type: "text",
-          url: "谨慎驾驶",
-          duration: 10,
-          order: 10,
-          level: "normal",
-          begin: "00:00",
-          end: "23:59",
-        },
-        {
-          id: "11",
-          type: "text",
-          url: "注意安全",
-          duration: 10,
-          order: 10,
-          level: "normal",
-          begin: "00:00",
-          end: "23:59",
-        },
-        {
-          id: "111",
-          type: "picture",
-          url: "http://127.0.0.1:9090/file/7e82f4d6-cf5f-4fc5-b1c8-e676c3b6df68.jpg",
-          duration: 10,
-          order: 10,
-          level: "normal",
-          begin: "00:00",
-          end: "23:59",
-        },
-      ],
+      playList: [],
     };
   },
+  computed: {},
+  watch: {
+    playList: {
+      handler(val, oldVal) {
+        console.log("playlist changed, stratPlay");
+        this.startPlay();
+      },
+      deep: true,
+    },
+  },
   components: { Home, TextShow },
+  destroyed() {
+    console.log("destroyed");
+    clearInterval(this.timerId_getList);
+    clearTimeout(this.timerId_next);
+  },
+  mounted() {
+    console.log("mounted");
+    let { width, height } = LedSize;
+    this.width = width;
+    this.height = height;
+    this.playListBak = getDefaultList();
+
+    //watch 监控 playList 的变化?
+    this.filterThePlayList();
+
+    //定时访问远程节目
+    this.timerId_getList = setInterval(() => {
+      this.getRomoteList();
+    }, 30000);
+  },
   methods: {
-    clickmy() {
+    startPlay() {
+      clearTimeout(this.timerId_next);
+      this.curIndex = -1; //
+      this.timerId_next = setTimeout(() => {
+        this.next();
+      }, 2000);
+    },
+    async getRomoteList() {
+      try {
+        let ret = await this.$http.get("schedulesList");
+        // console.log(ret);
+        let { schedulesList } = ret.data.data;
+        console.log(schedulesList);
+        if (schedulesList) {
+          let { width, height, list } = schedulesList;
+          this.width = width;
+          this.height = height;
+          if (width && height) {
+            LedSize.width = width;
+            LedSize.height = height;
+            console.log("LedSize ==>", LedSize.width, LedSize.height);
+          }
+          console.log(new Date().toString());
+          if (JSON.stringify(this.playListBak) !== JSON.stringify(list)) {
+            this.playListBak = list;
+            console.log("changed");
+          } else {
+            console.log("no changed");
+          }
+
+          //每次都要过滤, 判断是否有时段变化
+          this.filterThePlayList();
+
+          this.errCntForGetPlayList = 0;
+        }
+      } catch (err) {
+        console.log(err);
+        this.errCntForGetPlayList++;
+        if (this.errCntForGetPlayList >= 2) {
+          ////离线开始
+          console.log("开始播放离线--------->>>>>");
+          this.errCntForGetPlayList = 0;
+          this.playListBak = getDefaultList();
+          this.filterThePlayList();
+        }
+      }
+    },
+
+    filterThePlayList() {
+      let date = new Date();
+      let h = date.getHours();
+      let m = date.getMinutes();
+      h < 10 && (h = "0" + h);
+      m < 10 && (m = "0" + m);
+      let curTime = h + ":" + m;
+
+      // == null
+      if (!this.playListBak) return;
+
+      //[] length>=0
+
+      //过滤在时间段内的
+      let ret = this.playListBak.filter((v) => {
+        return v.begin_time <= curTime && v.end_time >= curTime;
+      });
+
+      //过滤top级别的
+      let retTopLevel = ret.filter((v) => {
+        return v.level == "top";
+      });
+
+      //if has top level only play tops
+      if (retTopLevel && retTopLevel.length > 0) {
+        let curPlaylist = JSON.stringify(this.playList);
+        let filterPlaylist = JSON.stringify(retTopLevel);
+        if (curPlaylist !== filterPlaylist) {
+          this.playList = JSON.parse(JSON.stringify(retTopLevel));
+        }
+      } else {
+        let curPlaylist = JSON.stringify(this.playList);
+        let filterPlaylist = JSON.stringify(ret);
+        if (curPlaylist !== filterPlaylist) {
+          this.playList = JSON.parse(JSON.stringify(ret));
+        }
+      }
+    },
+    next() {
+      if (!this.playList || this.playList.length == 0) {
+        console.log("!this.playList  || this.playList.length ==0");
+        return;
+      }
       if (this.curIndex < this.playList.length - 1) this.curIndex++;
       else this.curIndex = 0;
-    },
-    size(flag) {
-      if (flag == 1) {
-        this.program_info.font_size++;
-      } else {
-        this.program_info.font_size--;
+      console.log("curIndex", this.curIndex);
+      //console.log("playList length", this.playList.length);
+
+      let delayTime = this.playList[this.curIndex].delay;
+      if (delayTime) {
+        //
+        // console.log(delayTime);
+        clearTimeout(this.timerId_next);
+        this.timerId_next = setTimeout(() => {
+          this.next();
+        }, delayTime * 1000);
       }
-      console.log(this.program_info.font_size);
     },
   },
 };
 </script>
 <style lang="stylus">
+@import '~@/animatecss/animate.min.css';
+
+// 临时注销隐藏鼠标 2021-9-26
+.item {
+  cursor: none !important;
+}
+
 html, body {
   height: 100%;
   border: none;
@@ -106,19 +214,19 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-}
-
-.item {
-  width: 300px;
-  height: 200px;
-  border: 1px solid red;
+  // 背景色
+  background-color: #000;
 }
 
 .item img {
-  // width: 300px;
-  // height: 200px;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  // contain fill
+  object-fit: fill;
+}
+
+.item video {
+  width: 100%;
+  height: 100%;
 }
 </style>
